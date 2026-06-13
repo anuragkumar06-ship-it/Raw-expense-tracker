@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How We Built Spendly — Interactive Workshop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070512; --bg2:#0c0a1e; --bg3:#120f28; --bg4:#1a1638;
+  --card:#15122e; --card2:#100d24; --border:#2c2658; --border2:#3d3578;
+  --violet:#8b7dff; --violet2:#6d5cf0; --vglow:rgba(139,125,255,.32);
+  --emerald:#2ee6a6; --rose:#ff5d8f; --amber:#ffc24b; --sky:#3dd7ff;
+  --fuchsia:#e879f9; --indigo:#6366f1;
+  --text:#f4f2ff; --text2:#b3adda; --text3:#746da6;
+  --r:16px; --r2:22px;
+  --ease:cubic-bezier(.22,.72,.2,1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'DM Sans',system-ui,sans-serif;line-height:1.6;
+  overflow:hidden;position:relative;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== ambient aurora background ===== */
+.bg-orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:.55;will-change:transform;mix-blend-mode:screen}
+.orb.o1{width:620px;height:620px;background:radial-gradient(circle,#8b7dff,transparent 68%);top:-160px;left:-120px;animation:drift1 24s var(--ease) infinite}
+.orb.o2{width:560px;height:560px;background:radial-gradient(circle,#3dd7ff,transparent 68%);bottom:-180px;right:-100px;animation:drift2 28s var(--ease) infinite}
+.orb.o3{width:520px;height:520px;background:radial-gradient(circle,#e879f9,transparent 68%);top:34%;left:44%;animation:drift3 32s var(--ease) infinite}
+.orb.o4{width:440px;height:440px;background:radial-gradient(circle,#2ee6a6,transparent 70%);top:-60px;right:16%;animation:drift1 30s var(--ease) infinite reverse}
+.orb.o5{width:480px;height:480px;background:radial-gradient(circle,#ff5d8f,transparent 70%);bottom:-120px;left:20%;animation:drift2 26s var(--ease) infinite reverse}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(140px,90px) scale(1.18)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-120px,-80px) scale(1.12)}}
+@keyframes drift3{0%,100%{transform:translate(-50%,0) scale(1)}50%{transform:translate(-42%,70px) scale(.9)}}
+.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.45;
+  background-image:linear-gradient(rgba(139,125,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(139,125,255,.06) 1px,transparent 1px);
+  background-size:52px 52px;mask-image:radial-gradient(ellipse at 50% 35%,#000 22%,transparent 78%)}
+.bg-vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 38%,transparent 38%,rgba(4,2,10,.6) 100%)}
+.bg-noise{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.spotlight{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(600px circle at var(--mx,50%) var(--my,30%),rgba(139,125,255,.10),transparent 45%)}
+
+/* ===== top progress ===== */
+.progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:60;background:rgba(255,255,255,.04)}
+.progress-bar{height:100%;width:0;background:linear-gradient(90deg,var(--violet),var(--sky),var(--emerald));transition:width .5s var(--ease);box-shadow:0 0 12px var(--vglow)}
+
+/* ===== topbar ===== */
+.topbar{position:fixed;top:0;left:0;right:0;height:64px;z-index:55;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,4vw,42px)}
+.brand{display:flex;align-items:center;gap:11px;font-family:'Syne',sans-serif;font-weight:800;font-size:19px;letter-spacing:-.4px}
+.brand-mark{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;background:linear-gradient(135deg,var(--violet),var(--emerald));box-shadow:0 4px 18px var(--vglow)}
+.brand .accent{color:var(--violet)}
+.top-actions{display:flex;gap:10px}
+.icon-btn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:rgba(17,24,39,.6);color:var(--text2);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;backdrop-filter:blur(12px);transition:all .2s var(--ease)}
+.icon-btn:hover{color:var(--text);border-color:var(--violet);transform:translateY(-1px)}
+.icon-btn .gi{font-size:15px;line-height:1}
+
+/* ===== deck & slides ===== */
+.deck{position:fixed;inset:0;z-index:10}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+  padding:78px clamp(22px,6vw,84px) 82px;
+  opacity:0;visibility:hidden;transform:scale(.985) translateY(8px);
+  transition:opacity .6s var(--ease),transform .7s var(--ease),visibility .6s;
+  overflow:hidden}
+.slide.active{opacity:1;visibility:visible;transform:none}
+.slide-inner{width:100%;max-width:1080px;margin:0 auto}
+.slide.center{align-items:center;text-align:center}
+.slide.center .slide-inner{display:flex;flex-direction:column;align-items:center}
+
+/* reveal animation */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.reveal.left{transform:translateX(-30px)}
+.reveal.scale{transform:scale(.92)}
+.reveal.in{opacity:1;transform:none}
+
+/* ===== type ===== */
+.kicker{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--violet);margin-bottom:20px}
+.kicker::before{content:'';width:26px;height:1.5px;background:linear-gradient(90deg,var(--violet),transparent)}
+h1.display{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(40px,7.5vw,88px);line-height:1.02;letter-spacing:-2px;margin-bottom:22px}
+h2.title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(30px,5vw,58px);line-height:1.06;letter-spacing:-1.2px;margin-bottom:18px}
+.grad{background:linear-gradient(115deg,var(--violet),var(--fuchsia),var(--sky),var(--emerald),var(--violet));background-size:280% 280%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:gradShift 9s ease infinite}
+@keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.lead{font-size:clamp(16px,2.1vw,21px);color:var(--text2);font-weight:300;max-width:680px;line-height:1.6}
+.slide.center .lead{margin-left:auto;margin-right:auto}
+.muted{color:var(--text2)}
+strong{color:var(--text);font-weight:600}
+em{color:var(--text);font-style:normal;background:linear-gradient(transparent 60%,rgba(124,107,255,.22) 0);padding:0 2px}
+
+
+/* ===== badge / pills / chips ===== */
+.badge{display:inline-flex;align-items:center;gap:9px;background:rgba(124,107,255,.1);border:1px solid rgba(124,107,255,.28);color:var(--violet);padding:7px 16px;border-radius:999px;font-size:13px;font-weight:600;margin-bottom:30px}
+.dot-live{width:7px;height:7px;border-radius:50%;background:var(--emerald);box-shadow:0 0 9px var(--emerald);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.slide.center .chips{justify-content:center}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:999px;font-size:13.5px;font-weight:500;border:1px solid var(--border);background:var(--card);color:var(--text2)}
+.chip.violet{background:rgba(124,107,255,.1);border-color:rgba(124,107,255,.28);color:var(--violet)}
+.chip.emerald{background:rgba(15,218,133,.08);border-color:rgba(15,218,133,.22);color:var(--emerald)}
+.chip.amber{background:rgba(255,184,0,.08);border-color:rgba(255,184,0,.22);color:var(--amber)}
+.chip.sky{background:rgba(56,189,248,.08);border-color:rgba(56,189,248,.22);color:var(--sky)}
+.chip.rose{background:rgba(255,77,106,.08);border-color:rgba(255,77,106,.22);color:var(--rose)}
+
+/* ===== grids & cards ===== */
+.grid{display:grid;gap:18px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:26px;transition:transform .25s var(--ease),border-color .25s,box-shadow .25s}
+.card:hover{transform:translateY(-5px);border-color:var(--violet);box-shadow:0 18px 50px -20px var(--vglow)}
+.card .ic{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px}
+.card h3{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-.3px}
+.card p{color:var(--text2);font-size:14.5px;line-height:1.6}
+.ic-violet{background:rgba(124,107,255,.13)}.ic-sky{background:rgba(56,189,248,.12)}.ic-emerald{background:rgba(15,218,133,.1)}.ic-amber{background:rgba(255,184,0,.1)}.ic-rose{background:rgba(255,77,106,.1)}
+
+/* ===== journey flow ===== */
+.flow{display:flex;align-items:stretch;gap:0;margin-top:14px;flex-wrap:wrap;justify-content:center}
+.flow-node{flex:1;min-width:150px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px 18px;text-align:center;position:relative}
+.flow-node .fn-ic{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;border:2px solid}
+.flow-node .fn-step{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.flow-node h4{font-family:'Syne',sans-serif;font-size:15.5px;font-weight:700;margin-bottom:5px;line-height:1.2}
+.flow-node p{font-size:12.5px;color:var(--text2);line-height:1.45}
+.flow-arrow{display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:22px;padding:0 6px;flex:0 0 auto}
+@media(max-width:860px){.flow-arrow{transform:rotate(90deg);padding:8px 0}.flow{flex-direction:column}.flow-node{min-width:0}}
+
+/* ===== step layout ===== */
+.step-head{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+.step-num{width:64px;height:64px;border-radius:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#fff;background:linear-gradient(135deg,var(--violet),var(--violet2));box-shadow:0 10px 30px -8px var(--vglow)}
+.step-num.s2{background:linear-gradient(135deg,var(--sky),#1f8fd0)}
+.step-num.s3{background:linear-gradient(135deg,var(--emerald),#0a9b60)}
+.step-head .st-tag{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--violet);margin-bottom:5px}
+.step-head .st-tag.sky{color:var(--sky)}.step-head .st-tag.emerald{color:var(--emerald)}
+.step-head h2{font-family:'Syne',sans-serif;font-size:clamp(26px,4vw,44px);font-weight:800;letter-spacing:-1px;line-height:1.05}
+.substeps{display:flex;flex-direction:column;gap:11px;margin-top:8px}
+.substep{display:flex;gap:15px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:15px 19px;transition:border-color .2s,transform .2s}
+.substep:hover{border-color:var(--border2);transform:translateX(4px)}
+.ss-n{width:27px;height:27px;border-radius:8px;flex-shrink:0;background:rgba(124,107,255,.15);color:var(--violet);font-family:'Syne',sans-serif;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.ss-n.ok{background:rgba(15,218,133,.15);color:var(--emerald)}
+.ss-b strong{display:block;font-size:15px;margin-bottom:2px}
+.ss-b span{color:var(--text2);font-size:13.5px;line-height:1.5}
+
+/* callouts */
+.callout{display:flex;gap:13px;align-items:flex-start;border-radius:13px;padding:15px 19px;margin-top:18px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2)}
+.callout .ci{font-size:18px;flex-shrink:0;margin-top:1px}
+.callout p{color:var(--text2);font-size:14px;line-height:1.55;margin:0}
+.callout.tip{background:rgba(15,218,133,.06);border-color:rgba(15,218,133,.2)}
+.callout.warn{background:rgba(255,184,0,.06);border-color:rgba(255,184,0,.2)}
+
+/* quote card */
+.quote{position:relative;background:linear-gradient(135deg,rgba(124,107,255,.1),rgba(56,189,248,.05));border:1px solid rgba(124,107,255,.25);border-radius:var(--r2);padding:30px 34px;margin-top:8px}
+.quote .qm{font-family:'Syne',sans-serif;font-size:60px;line-height:.6;color:var(--violet);opacity:.4;height:28px}
+.quote p{font-size:clamp(17px,2.4vw,23px);color:var(--text);font-weight:300;line-height:1.5}
+
+/* ===== prompt / code panel ===== */
+.panel{background:#070b12;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-top:8px}
+.panel.violet-edge{border-color:rgba(124,107,255,.3)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.panel-head .ph-left{display:flex;align-items:center;gap:11px}
+.dots{display:flex;gap:6px}.dots span{width:11px;height:11px;border-radius:50%}
+.ph-title{font-size:13px;font-weight:600;color:var(--text2)}
+.copy-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(124,107,255,.15);border:1px solid rgba(124,107,255,.3);color:var(--violet);padding:6px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .2s}
+.copy-btn:hover{background:rgba(124,107,255,.3)}
+.panel-body{padding:20px;font-family:'DM Mono',monospace;font-size:13px;line-height:1.7;color:#c9d6e8;white-space:pre-wrap;max-height:46vh;overflow-y:auto}
+.panel-body::-webkit-scrollbar{width:6px}.panel-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:8px}
+.panel-body .hi{color:var(--violet);font-weight:600}
+.panel-body .sec{color:var(--amber);font-weight:600}
+.panel-body .item{color:var(--emerald)}
+.panel-body .val{color:var(--sky)}
+.panel-body .note{color:var(--text3)}
+.panel-body .str{color:var(--emerald)}
+.panel-body .com{color:var(--text3)}
+.panel-body .kw{color:var(--violet)}
+.panel-body .em{color:var(--amber)}
+
+/* ===== mock app window ===== */
+.mock{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.8);margin-top:6px}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:11px 15px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)}
+.mock-bar .d{width:11px;height:11px;border-radius:50%}
+.mock-url{margin-left:12px;font-size:12px;color:var(--text3);font-family:'DM Mono',monospace}
+.mock-body{padding:20px}
+.mock-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.mstat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+.mstat span{display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.mstat b{font-family:'DM Mono',monospace;font-size:19px;font-weight:500}
+.mstat.violet b{color:var(--violet)}.mstat.emerald b{color:var(--emerald)}.mstat.rose b{color:var(--rose)}.mstat.amber b{color:var(--amber)}
+.mock-low{display:grid;grid-template-columns:200px 1fr;gap:16px}
+.mdonut{aspect-ratio:1;max-width:160px;border-radius:50%;margin:0 auto;position:relative;background:conic-gradient(var(--violet) 0 34%,var(--rose) 34% 58%,var(--amber) 58% 78%,var(--sky) 78% 90%,var(--emerald) 90% 100%)}
+.mdonut::after{content:'';position:absolute;inset:24%;border-radius:50%;background:var(--card)}
+.mbars{display:flex;align-items:flex-end;gap:12px;padding:10px 4px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.mbars i{flex:1;border-radius:6px 6px 0 0;background:linear-gradient(180deg,var(--violet),var(--violet2));opacity:.85}
+.mbars i:nth-child(1){height:48%}.mbars i:nth-child(2){height:72%}.mbars i:nth-child(3){height:40%}.mbars i:nth-child(4){height:88%;background:linear-gradient(180deg,var(--emerald),#0a9b60)}.mbars i:nth-child(5){height:60%}.mbars i:nth-child(6){height:34%}
+@media(max-width:760px){.mock-stats{grid-template-columns:repeat(2,1fr)}.mock-low{grid-template-columns:1fr}}
+
+/* link cards */
+.linkcard{display:flex;align-items:center;gap:18px;background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:22px 26px;text-decoration:none;color:var(--text);transition:transform .25s var(--ease),border-color .25s,box-shadow .25s}
+.linkcard:hover{transform:translateY(-4px);border-color:var(--violet);box-shadow:0 18px 50px -22px var(--vglow)}
+.linkcard .lc-ic{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.linkcard .lc-lab{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
+.linkcard h4{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:3px}
+.linkcard .lc-url{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--sky);word-break:break-all}
+.linkcard .lc-go{margin-left:auto;font-size:22px;color:var(--text3)}
+
+/* feature mini cards */
+.feat{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:18px;transition:transform .25s var(--ease),border-color .25s}
+.feat:hover{transform:translateY(-4px);border-color:var(--violet)}
+.feat .fe{font-size:25px;display:block;margin-bottom:9px}
+.feat h4{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px}
+.feat p{color:var(--text2);font-size:12.8px;line-height:1.45}
+
+/* ===== bottom controls ===== */
+.controls{position:fixed;bottom:0;left:0;right:0;height:72px;z-index:55;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(18px,4vw,42px)}
+.dots-nav{display:flex;gap:8px;align-items:center}
+.dots-nav .d{width:8px;height:8px;border-radius:50%;background:var(--border2);border:none;cursor:pointer;padding:0;transition:all .3s var(--ease)}
+.dots-nav .d:hover{background:var(--text3)}
+.dots-nav .d.on{width:26px;border-radius:999px;background:linear-gradient(90deg,var(--violet),var(--sky))}
+.nav-arrows{display:flex;align-items:center;gap:12px}
+.navb{width:42px;height:42px;border-radius:11px;border:1px solid var(--border);background:rgba(17,24,39,.6);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);transition:all .2s var(--ease)}
+.navb:hover{border-color:var(--violet);background:rgba(124,107,255,.15);color:var(--violet)}
+.navb:disabled{opacity:.3;cursor:default}
+.counter{font-family:'DM Mono',monospace;font-size:13px;color:var(--text2);min-width:62px;text-align:center}
+.counter b{color:var(--text)}
+
+/* hint */
+.hint{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:54;font-size:12.5px;color:var(--text3);background:rgba(8,13,20,.7);border:1px solid var(--border);padding:7px 16px;border-radius:999px;backdrop-filter:blur(12px);transition:opacity .5s;white-space:nowrap}
+.hint.hide{opacity:0;pointer-events:none}
+
+/* ===== overview menu ===== */
+.overview{position:fixed;inset:0;z-index:80;background:rgba(6,10,16,.86);backdrop-filter:blur(18px);opacity:0;pointer-events:none;transition:opacity .35s var(--ease);overflow-y:auto;padding:80px clamp(20px,5vw,60px)}
+.overview.open{opacity:1;pointer-events:auto}
+.ov-title{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;letter-spacing:-.5px;margin-bottom:6px;text-align:center}
+.ov-sub{text-align:center;color:var(--text2);font-size:14px;margin-bottom:34px}
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;max-width:1000px;margin:0 auto}
+.ov-item{text-align:left;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;cursor:pointer;color:var(--text);font-family:'DM Sans',sans-serif;transition:all .2s var(--ease)}
+.ov-item:hover{border-color:var(--violet);transform:translateY(-3px);background:rgba(124,107,255,.08)}
+.ov-item .oi-n{font-family:'DM Mono',monospace;font-size:12px;color:var(--violet);margin-bottom:7px}
+.ov-item .oi-t{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;line-height:1.25}
+.ov-close{position:fixed;top:20px;right:24px;width:44px;height:44px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:20px;cursor:pointer}
+
+@media(max-width:860px){.g3,.g4{grid-template-columns:1fr 1fr}.step-num{width:52px;height:52px;font-size:22px}}
+@media(max-width:560px){.g3,.g4,.g2{grid-template-columns:1fr}.slide{padding:80px 20px 92px}.hint{display:none}.icon-btn .lbl{display:none}}
+.kbd{font-family:'DM Mono',monospace;font-size:.9em;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:1px 7px;color:var(--text)}
+
+/* ===== interactive cursor shine on cards ===== */
+.card,.feat,.linkcard,.flow-node{position:relative;overflow:hidden}
+.card::after,.feat::after,.linkcard::after,.flow-node::after{content:'';position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .35s var(--ease);background:radial-gradient(340px circle at var(--mx,50%) var(--my,50%),rgba(139,125,255,.18),transparent 46%);pointer-events:none}
+.card:hover::after,.feat:hover::after,.linkcard:hover::after,.flow-node:hover::after{opacity:1}
+.card::before,.feat::before{content:'';position:absolute;top:0;left:14%;right:14%;height:1px;background:linear-gradient(90deg,transparent,rgba(139,125,255,.65),transparent);opacity:.55}
+.card:hover,.feat:hover,.linkcard:hover{box-shadow:0 22px 60px -24px var(--vglow),0 0 0 1px rgba(139,125,255,.18) inset}
+
+/* ===== brand logos ===== */
+.logo-svg{display:inline-block;flex:none;line-height:0}
+.chip .logo-svg{vertical-align:-3px;margin-right:3px}
+.step-num .logo-svg{filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))}
+
+/* ===== Spendly logo + premium polish ===== */
+.brand-mark{width:auto;height:auto;background:none;box-shadow:none;border-radius:0;display:inline-flex;align-items:center;filter:drop-shadow(0 4px 14px var(--vglow))}
+::selection{background:rgba(139,125,255,.32);color:#fff}
+.slide{justify-content:center}
+.card,.feat{background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,0) 55%),var(--card)}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 26%),#08060f}
+.reveal{filter:blur(6px);transition:opacity .7s var(--ease),transform .7s var(--ease),filter .7s var(--ease)}
+.reveal.in{filter:blur(0)}
+.topbar{background:linear-gradient(180deg,rgba(7,5,18,.78),rgba(7,5,18,0));backdrop-filter:blur(3px)}
+.controls{background:linear-gradient(0deg,rgba(7,5,18,.8),rgba(7,5,18,0))}
+.nav-arrows{background:rgba(20,16,40,.55);border:1px solid var(--border);border-radius:999px;padding:6px;backdrop-filter:blur(14px)}
+.nav-arrows .navb{border:none;background:transparent;width:40px;height:40px}
+.nav-arrows .navb:hover:not(:disabled){background:rgba(139,125,255,.18);color:var(--violet)}
+.dots-nav{background:rgba(20,16,40,.45);border:1px solid var(--border);border-radius:999px;padding:9px 14px;backdrop-filter:blur(14px)}
+.step-num{position:relative;border-radius:18px}
+.step-num::after{content:'';position:absolute;inset:-5px;border-radius:22px;border:1.5px solid rgba(139,125,255,.45);opacity:0;animation:ringPulse 2.6s var(--ease) infinite;pointer-events:none}
+.step-num.s2::after{border-color:rgba(61,215,255,.45)}
+.step-num.s3::after{border-color:rgba(46,230,166,.45)}
+@keyframes ringPulse{0%{transform:scale(.96);opacity:.7}70%{transform:scale(1.32);opacity:0}100%{opacity:0}}
+
+/* ================= LIGHT THEME — projector friendly ================= */
+:root{
+  --bg:#f5f6fc; --bg2:#eef1f9; --bg3:#e7eaf5; --bg4:#dfe3f1;
+  --card:#ffffff; --card2:#f7f8fd; --border:#e3e7f2; --border2:#cdd4e6;
+  --violet:#6d5cf0; --violet2:#5746e0; --vglow:rgba(109,92,240,.20);
+  --emerald:#0f9d6e; --rose:#ef3e6d; --amber:#c27f08; --sky:#0a86c9;
+  --fuchsia:#c026d3; --indigo:#4f46e5;
+  --text:#1b2236; --text2:#56607c; --text3:#8b93ab;
+}
+body{color:var(--text)}
+.progress{background:rgba(27,34,54,.07)}
+.orb{mix-blend-mode:normal;opacity:.30;filter:blur(110px)}
+.orb.o1{background:radial-gradient(circle,#c8bdff,transparent 70%)}
+.orb.o2{background:radial-gradient(circle,#bce6ff,transparent 70%)}
+.orb.o3{background:radial-gradient(circle,#f7caf3,transparent 70%)}
+.orb.o4{background:radial-gradient(circle,#bdf0db,transparent 70%)}
+.orb.o5{background:radial-gradient(circle,#ffd1de,transparent 70%)}
+.bg-grid{opacity:.5;background-image:linear-gradient(rgba(99,102,241,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.06) 1px,transparent 1px)}
+.bg-vignette{background:radial-gradient(ellipse at 50% 34%,transparent 58%,rgba(27,34,54,.07) 100%)}
+.bg-noise{opacity:.022}
+.spotlight{background:radial-gradient(600px circle at var(--mx,50%) var(--my,30%),rgba(109,92,240,.08),transparent 45%)}
+.topbar{background:linear-gradient(180deg,rgba(245,246,252,.88),rgba(245,246,252,0));backdrop-filter:blur(6px)}
+.controls{background:linear-gradient(0deg,rgba(245,246,252,.92),rgba(245,246,252,0))}
+.icon-btn{background:rgba(255,255,255,.72);color:var(--text2);border-color:var(--border)}
+.icon-btn:hover{color:var(--text);border-color:var(--violet)}
+.nav-arrows,.dots-nav{background:rgba(255,255,255,.74);border-color:var(--border);box-shadow:0 8px 22px -12px rgba(27,34,54,.28)}
+.navb{color:var(--text)} .counter{color:var(--text2)} .counter b{color:var(--text)}
+.hint{background:rgba(255,255,255,.86);border-color:var(--border);color:var(--text2)}
+.overview{background:rgba(244,246,252,.93)}
+.ov-close,.ov-item{background:#fff;color:var(--text);border-color:var(--border)}
+.ov-item:hover{background:rgba(109,92,240,.07)}
+.lead{color:#46506b;font-weight:400}
+.card,.feat{background:linear-gradient(165deg,rgba(109,92,240,.05),rgba(255,255,255,0) 55%),#ffffff;box-shadow:0 12px 32px -20px rgba(27,34,54,.28)}
+.card:hover,.feat:hover,.linkcard:hover{box-shadow:0 26px 60px -28px rgba(109,92,240,.5),0 0 0 1px rgba(109,92,240,.16) inset}
+.card::after,.feat::after,.linkcard::after,.flow-node::after{background:radial-gradient(340px circle at var(--mx,50%) var(--my,50%),rgba(109,92,240,.12),transparent 46%)}
+.card::before,.feat::before{background:linear-gradient(90deg,transparent,rgba(109,92,240,.55),transparent);opacity:.6}
+.substep,.linkcard,.flow-node,.mock{box-shadow:0 8px 24px -16px rgba(27,34,54,.20)}
+.panel{background:linear-gradient(180deg,rgba(109,92,240,.04),transparent 22%),#f3f4fb !important;border-color:var(--border)}
+.panel.violet-edge{border-color:rgba(109,92,240,.35)}
+.panel-head{background:rgba(27,34,54,.02);border-color:var(--border)}
+.ph-title{color:var(--text2)}
+.panel-body{color:#2a3350}
+.panel-body .hi{color:#6d28d9} .panel-body .sec{color:#5746e0} .panel-body .item{color:#0c8f63}
+.panel-body .val{color:#0a78b8} .panel-body .str{color:#0a7d5a} .panel-body .com{color:#8b93ab}
+.panel-body .kw{color:#6d28d9} .panel-body .em{color:#b45309} .panel-body .note{color:#8b93ab}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border2)}
+.copy-btn{background:rgba(109,92,240,.12);border-color:rgba(109,92,240,.3);color:#5746e0}
+.copy-btn:hover{background:rgba(109,92,240,.2)}
+.kbd{background:#eceefb;border-color:var(--border2);color:var(--text)}
+::selection{background:rgba(109,92,240,.22);color:#1b2236}
+.dots-nav .d{background:#c7cde0} .dots-nav .d:hover{background:#9aa3bd}
+.dots-nav .d.on{background:linear-gradient(90deg,var(--violet),var(--sky))}
+::-webkit-scrollbar-thumb{background:var(--border2)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="lovableGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-1 22.49999 -30.45394 -1.3535 14 3)">
+      <stop offset=".25" stop-color="#FE7B02"/><stop offset=".433" stop-color="#FE4230"/><stop offset=".548" stop-color="#FE529A"/><stop offset=".654" stop-color="#DD67EE"/><stop offset=".95" stop-color="#4B73FF"/>
+    </radialGradient>
+    <linearGradient id="spendlyGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7dff"/><stop offset=".5" stop-color="#3dd7ff"/><stop offset="1" stop-color="#2ee6a6"/></linearGradient>
+  </defs>
+  <symbol id="ic-claude" viewBox="0 0 24 24"><path fill="currentColor" d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z"/></symbol>
+  <symbol id="ic-lovable" viewBox="0 0 24 24"><path fill="url(#lovableGrad)" d="M7.082 0c3.91 0 7.081 3.179 7.081 7.1v2.7h2.357c3.91 0 7.082 3.178 7.082 7.1 0 3.923-3.17 7.1-7.082 7.1H0V7.1C0 3.18 3.17 0 7.082 0z"/></symbol>
+  <symbol id="ic-spendly" viewBox="0 0 40 40"><rect x="2.5" y="2.5" width="35" height="35" rx="11.5" fill="url(#spendlyGrad)"/><path d="M10.5 26 L17 19.5 L22 23.5 L29.5 13.5" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="29.5" cy="13.5" r="2.9" fill="#fff"/></symbol>
+</svg>
+<div class="bg-orbs"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="orb o4"></div><div class="orb o5"></div></div>
+<div class="bg-grid"></div>
+<div class="bg-vignette"></div>
+<div class="bg-noise"></div>
+<div class="spotlight" id="spotlight"></div>
+
+<div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+<header class="topbar">
+  <div class="brand reveal in"><span class="brand-mark"><svg viewBox="0 0 40 40" width="32" height="32"><use href="#ic-spendly"/></svg></span>Spend<span class="accent">ly</span></div>
+  <div class="top-actions">
+    <button class="icon-btn" id="menuBtn" title="Menu (M)"><span class="gi">▦</span><span class="lbl">Menu</span></button>
+    <button class="icon-btn" id="fsBtn" title="Fullscreen (F)"><span class="gi">⛶</span></button>
+  </div>
+</header>
+
+<div class="deck" id="deck">
+
+
+<!-- SLIDE 1 — COVER -->
+<section class="slide center" data-title="Cover">
+  <div class="slide-inner">
+    <div class="reveal" style="margin-bottom:24px"><svg viewBox="0 0 40 40" width="78" height="78" style="filter:drop-shadow(0 12px 30px var(--vglow))"><use href="#ic-spendly"/></svg></div>
+    <div class="badge reveal"><span class="dot-live"></span> IIM Jammu · MDP Workshop · AI App Building</div>
+    <h1 class="display reveal">How We Built<br><span class="grad">Spendly</span></h1>
+    <p class="lead reveal">An idea became a real, live, AI-powered finance app — built entirely by guiding AI. Not a single line of code written by hand.</p>
+    <div class="chips reveal">
+      <span class="chip violet"><svg class="logo-svg" style="width:15px;height:15px;color:#D97757"><use href="#ic-claude"/></svg> Claude</span>
+      <span class="chip sky"><svg class="logo-svg" style="width:15px;height:15px"><use href="#ic-lovable"/></svg> Lovable</span>
+      <span class="chip amber">📊 Chart.js</span>
+    </div>
+    <div class="chips reveal" style="margin-top:34px">
+      <span class="chip">Press <span class="kbd">→</span> or <span class="kbd">Space</span> to begin</span>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 2 — THE PROMISE -->
+<section class="slide" data-title="The Promise">
+  <div class="slide-inner">
+    <div class="kicker reveal">The promise</div>
+    <h2 class="title reveal">By the end of this,<br>you can build a real app too.</h2>
+    <p class="lead reveal" style="margin-bottom:14px">No technical background. No installs. Just clear thinking and the right AI tools.</p>
+    <div class="grid g3" style="margin-top:30px">
+      <div class="card reveal" data-delay="120"><div class="ic ic-violet">🎯</div><h3>Idea → working app</h3><p>You describe what you want in plain English. The AI does the building for you.</p></div>
+      <div class="card reveal" data-delay="220"><div class="ic ic-emerald">🆓</div><h3>Free, in the browser</h3><p>Every tool we use is free and runs in a browser tab. No setup, no credit card.</p></div>
+      <div class="card reveal" data-delay="320"><div class="ic ic-sky">🙌</div><h3>No coding needed</h3><p>If you can write a clear email, you already have the only skill required.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 3 — MEET SPENDLY -->
+<section class="slide" data-title="Meet Spendly">
+  <div class="slide-inner">
+    <div class="kicker reveal">What we built</div>
+    <h2 class="title reveal">Meet <span class="grad">Spendly</span> — a personal finance app.</h2>
+    <p class="lead reveal">Track spending, set budgets, chase savings goals, see charts, and chat with an AI money advisor — all in one clean app.</p>
+    <div class="mock reveal scale" data-delay="260">
+      <div class="mock-bar"><span class="d" style="background:#ff5f57"></span><span class="d" style="background:#febc2e"></span><span class="d" style="background:#28c840"></span><span class="mock-url">ai-guided-finances.lovable.app</span></div>
+      <div class="mock-body">
+        <div class="mock-stats">
+          <div class="mstat violet"><span>Balance</span><b data-count="84200" data-prefix="₹" data-fmt="in">₹0</b></div>
+          <div class="mstat emerald"><span>Income</span><b data-count="120000" data-prefix="₹" data-fmt="in">₹0</b></div>
+          <div class="mstat rose"><span>Expenses</span><b data-count="35800" data-prefix="₹" data-fmt="in">₹0</b></div>
+          <div class="mstat amber"><span>Savings</span><b data-count="70" data-suffix="%">0%</b></div>
+        </div>
+        <div class="mock-low">
+          <div class="mdonut"></div>
+          <div class="mbars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+    <p class="muted reveal" style="font-size:13.5px;margin-top:14px">↑ A look of the live app. Every screen here was generated by AI from one prompt.</p>
+  </div>
+</section>
+
+<!-- SLIDE 4 — THE JOURNEY -->
+<section class="slide" data-title="The Journey">
+  <div class="slide-inner">
+    <div class="kicker reveal">The big picture</div>
+    <h2 class="title reveal">Three moves.<br>Idea to live app.</h2>
+    <p class="lead reveal">Here is the entire journey on one screen. We'll walk through each move next.</p>
+    <div class="flow" style="margin-top:34px">
+      <div class="flow-node reveal" data-delay="140">
+        <div class="fn-ic" style="border-color:#D97757"><svg class="logo-svg" style="width:26px;height:26px;color:#D97757"><use href="#ic-claude"/></svg></div>
+        <div class="fn-step">Move 1</div>
+        <h4>Brief Claude</h4>
+        <p>Describe the app, ask Claude to write a master prompt.</p>
+      </div>
+      <div class="flow-arrow reveal" data-delay="200">→</div>
+      <div class="flow-node reveal" data-delay="260">
+        <div class="fn-ic" style="border-color:var(--sky);color:var(--sky)">📄</div>
+        <div class="fn-step">Move 2</div>
+        <h4>Run the prompt</h4>
+        <p>Paste it back to Claude → get the full app as one HTML file.</p>
+      </div>
+      <div class="flow-arrow reveal" data-delay="320">→</div>
+      <div class="flow-node reveal" data-delay="380">
+        <div class="fn-ic" style="border-color:#FE529A"><svg class="logo-svg" style="width:26px;height:26px"><use href="#ic-lovable"/></svg></div>
+        <div class="fn-step">Move 3</div>
+        <h4>Ship with Lovable</h4>
+        <p>Add a Google login, make the AI usable, and go live.</p>
+      </div>
+    </div>
+    <div class="callout tip reveal" data-delay="460"><div class="ci">🔑</div><p><strong>The clever bit:</strong> Move 1 doesn't build the app — it builds the <em>prompt</em> that builds the app. A sharp prompt is what makes the result look this good.</p></div>
+  </div>
+</section>
+
+<!-- SLIDE 5 — TOOLBOX -->
+<section class="slide" data-title="The Toolbox">
+  <div class="slide-inner">
+    <div class="kicker reveal">The toolbox</div>
+    <h2 class="title reveal">Three tools. All free.<br>All in the browser.</h2>
+    <div class="grid g3" style="margin-top:30px">
+      <div class="card reveal" data-delay="120"><div class="ic ic-violet"><svg class="logo-svg" style="width:26px;height:26px;color:#D97757"><use href="#ic-claude"/></svg></div><h3>Claude <span class="muted" style="font-weight:400;font-size:14px">· claude.ai</span></h3><p>The AI that writes the entire app from our prompt. It also powers the AI Advisor inside Spendly.</p></div>
+      <div class="card reveal" data-delay="220"><div class="ic ic-sky"><svg class="logo-svg" style="width:26px;height:26px"><use href="#ic-lovable"/></svg></div><h3>Lovable <span class="muted" style="font-weight:400;font-size:14px">· lovable.dev</span></h3><p>An AI web-app builder. It turns our file into a real website with logins and a live link.</p></div>
+      <div class="card reveal" data-delay="320"><div class="ic ic-amber">📊</div><h3>Chart.js</h3><p>Draws every chart — bars, donuts, lines. Loaded automatically, so there's nothing to install.</p></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- SLIDE 6 — STEP 1 -->
+<section class="slide" data-title="Step 1 · Brief Claude">
+  <div class="slide-inner">
+    <div class="step-head reveal">
+      <div class="step-num">1</div>
+      <div><div class="st-tag">Step 01 · Claude.ai</div><h2>Brief the AI — and ask it to write the prompt.</h2></div>
+    </div>
+    <p class="lead reveal" data-delay="120">Here's the clever bit: we don't ask Claude to build the app yet. First we paste this <strong>simple brief</strong> — it asks Claude to write us the detailed master prompt. Like briefing an architect, who then draws the blueprint.</p>
+    <div class="panel violet-edge reveal" data-delay="220">
+      <div class="panel-head">
+        <div class="ph-left"><div class="dots"><span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span></div><span class="ph-title">Briefing prompt — paste into Claude first</span></div>
+        <button class="copy-btn" data-copy="briefPromptText">⧉ Copy</button>
+      </div>
+      <div class="panel-body">I want to make a personal expense tracker app called <span class="str">"Spendly"</span> — with a dashboard, charts, budgets, savings goals, and an AI advisor.
+
+<span class="em">Don't build it yet.</span> First, write me a detailed prompt that I can paste back to you to create the whole app as a <span class="hi">single HTML file</span>.
+
+<span class="hi">Just give me the prompt to copy.</span></div>
+    </div>
+    <div class="callout reveal" data-delay="340"><div class="ci">✨</div><p>Claude reads this brief and writes back a long, precise <strong>master prompt</strong> — that's the blueprint we use in Step 2.</p></div>
+    <div class="chips reveal" data-delay="440">
+      <span class="chip violet">📝 Plain English in</span>
+      <span class="chip sky">📐 Detailed prompt out</span>
+      <span class="chip emerald">🎯 Be specific about features</span>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 7 — STEP 2 -->
+<section class="slide" data-title="Step 2 · Generate the App">
+  <div class="slide-inner">
+    <div class="step-head reveal">
+      <div class="step-num s2">2</div>
+      <div><div class="st-tag sky">Step 02 · Claude.ai</div><h2>Paste the prompt back — get the whole app.</h2></div>
+    </div>
+    <div class="substeps">
+      <div class="substep reveal" data-delay="140"><div class="ss-n">1</div><div class="ss-b"><strong>Open claude.ai and start a new chat</strong><span>Sign in with Google — a free account is all you need.</span></div></div>
+      <div class="substep reveal" data-delay="220"><div class="ss-n">2</div><div class="ss-b"><strong>Paste the master prompt and press send</strong><span>The full prompt spells out colours, pages, charts, and behaviour.</span></div></div>
+      <div class="substep reveal" data-delay="300"><div class="ss-n">3</div><div class="ss-b"><strong>Let Claude work</strong><span>It writes the entire app — this can take a little while. A very long output is completely normal; it's building everything.</span></div></div>
+      <div class="substep reveal" data-delay="380"><div class="ss-n ok">4</div><div class="ss-b"><strong>Copy the code, save as index.html</strong><span>Paste into Notepad, save as <span class="kbd">index.html</span>, and open it in any browser to test.</span></div></div>
+    </div>
+    <div class="callout warn reveal" data-delay="480"><div class="ci">⚠️</div><p>If Claude pauses mid-way, just reply <strong>“continue”</strong> and it will finish. Very long outputs sometimes get cut off — totally normal.</p></div>
+  </div>
+</section>
+
+<!-- SLIDE 8 — MASTER PROMPT -->
+<section class="slide" data-title="The Master Prompt">
+  <div class="slide-inner">
+    <div class="kicker reveal">The secret sauce</div>
+    <h2 class="title reveal" style="margin-bottom:10px">The Master Prompt.</h2>
+    <p class="lead reveal" data-delay="80" style="margin-bottom:8px">This exact brief produced the whole app. Notice how specific it is — that's why it works.</p>
+    <div class="panel violet-edge reveal" data-delay="180">
+      <div class="panel-head">
+        <div class="ph-left"><div class="dots"><span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span></div><span class="ph-title">Master Prompt — paste into Claude</span></div>
+        <button class="copy-btn" data-copy="masterPromptText">⧉ Copy</button>
+      </div>
+      <div class="panel-body"><span class="hi">Build a premium personal finance web app called "Spendly" as a single self-contained HTML file.</span>
+Use Chart.js 4.4.1 from cdnjs and Outfit + DM Mono from Google Fonts.
+No other external dependencies.
+
+<span class="sec">━━━ 🎨 DESIGN SYSTEM ━━━</span>
+CSS variables only — never hardcode colors:
+
+--bg:#080d14  --bg2:#0e1420  --bg3:#151c2c  --bg4:#1c2438
+--card:#111827  --border:#1e2d45  --border2:#243350
+--violet:#7c6bff  --violet2:#6254e8  --violet-glow:rgba(124,107,255,0.18)
+--emerald:#0fda85  --rose:#ff4d6a  --amber:#ffb800  --sky:#38bdf8
+--text:#e8edf5  --text2:#8fa3be  --text3:#4a637e
+
+Font: Outfit for all UI, DM Mono for amounts/codes.
+Background #080d14. Cards use #111827 with 1px solid #1e2d45 border,
+border-radius:20px, subtle drop shadow, and a lift + glow on hover.
+
+<span class="sec">━━━ 🏗️ LAYOUT ━━━</span>
+Fixed left sidebar (260px wide, #0e1420 bg) + scrollable main area.
+
+Sidebar contains:
+• Logo: gradient violet square icon + "Spendly" wordmark (violet accent on "ly")
+• Nav items with emoji icons, active state = violet gradient bg + violet border
+• Section labels in uppercase 10px tracking
+• Bottom user card with gradient avatar (violet→emerald), name, email
+
+Sticky topbar (70px, backdrop-filter:blur(20px)) with:
+• Hamburger (mobile) + page title left side
+• Month selector (‹ select ›) + "+ Add Transaction" button right side
+
+Mobile: sidebar slides in/out with dark overlay, hamburger shows at ≤800px.
+
+<span class="sec">━━━ 📄 PAGES (7 total, SPA via tab switching) ━━━</span>
+
+1. Dashboard
+• 4 stat cards in a row: Balance (violet glow), Income (emerald), Expenses (rose),
+  Savings Rate (amber). Each has an icon, animated counter, and a small sub-badge.
+• 2 more stat cards: Daily Avg Spend, Biggest Expense.
+• 2-column row: Donut chart (expense breakdown) + Spending by Category bar list
+  with colored progress bars.
+• Recent transactions list (last 8).
+
+2. Transactions
+• Filter row: search bar + All/Income/Expense pills + category dropdown +
+  sort dropdown + 📥 Export CSV button.
+• Summary chips row (filtered totals).
+• Full scrollable transaction list, each item: category emoji icon (colored bg circle),
+  title, category + note, edit/delete actions, amount (green +/red −),
+  date + optional 🔄 recurring amber badge.
+
+3. Analytics
+• Income vs Expense grouped bar chart (6 months).
+• Expense distribution donut chart + legend.
+• Cumulative cash flow line chart.
+• Top spending categories ranked list.
+• Daily spending heatmap (grid of day squares, color intensity = spend amount).
+
+4. Budget
+• Budget overview bar chart + Budget Health Score gauge (canvas arc ring, 0–100,
+  color: green≥80, amber≥60, red&lt;60).
+• Category budget cards: progress bar turns amber at 75%, rose at 90%,
+  label shows ₹spent/₹limit, over-budget chip.
+
+5. Goals
+• Goal cards: emoji + name, % badge, animated progress bar (violet fill),
+  ₹saved / ₹to-go / days left footer, inline top-up input + "Add" button,
+  "🏆 Goal Complete!" state.
+• Goals bar chart (saved vs target per goal).
+
+6. Insights
+• Financial Health Score ring + interpretation label.
+• Personalized insight cards (auto-generated from actual data: savings rate,
+  budget breaches, biggest category).
+• Spending forecast line chart for rest of current month.
+• 6-month income vs expense trend line.
+
+7. AI Advisor
+• Header bar: gradient icon, title, green pulsing online dot.
+• Chat window (max-height:450px, scrollable): bot bubbles (dark card, top-left
+  radius flat) + user bubbles (violet gradient, top-right radius flat),
+  avatars, typing indicator (3 animated dots).
+• Quick-prompt chips: 'Analyze my spending', 'Am I on track with my goals?',
+  'How can I save more?', 'Where am I overspending?', 'Forecast my month-end balance'.
+• Textarea input + send button (violet gradient, arrow icon).
+• Enter to send, Shift+Enter for newline.
+• Right panel: Financial Snapshot card (income, expenses, balance, savings rate,
+  tx count, goals count) + Tips card.
+• On send, call POST https://api.anthropic.com/v1/messages with
+  model claude-sonnet-4-20250514, inject user's real transactions/budgets/goals
+  as system context. Show typing indicator while awaiting response.
+
+<span class="sec">━━━ 📋 TRANSACTION MODAL ━━━</span>
+Full-screen overlay modal with:
+• Expense / Income toggle pills (rose active vs emerald active).
+• Amount input (large, centered, ₹ prefix).
+• Description input.
+• Category grid (emoji buttons, selected = violet border + bg glow).
+  Categories: Food, Transport, Shopping, Entertainment, Health, Bills, Education,
+  Travel, Housing, Freelance, Salary, Investment, Other.
+• Date picker.
+• Note input.
+• "🔄 Mark as recurring" checkbox row (amber accent, styled container).
+• Full-width "Save Transaction" button.
+• Escape to close, click outside overlay to close.
+
+<span class="sec">━━━ 💾 DATA &amp; LOGIC ━━━</span>
+• localStorage for all state (spendly_tx, spendly_budgets, spendly_goals).
+• Seed 25+ realistic transactions across Apr–May 2025 on first load.
+• uid() = Date.now() + Math.random() string for IDs.
+• INR(v) formatter using Intl.NumberFormat('en-IN') with ₹ symbol.
+• All charts: dark theme, #1e2d45 grid lines, #4a637e tick labels,
+  tooltips with dark bg.
+• renderAll() re-renders current page on any data change.
+• Keyboard: N = open Add Transaction modal (when no modal open and not typing),
+  Escape = close any modal.
+• Toast notifications (bottom-right, slide up, ✅/❌ prefix, auto-dismiss 3s).
+• animateCount() for all stat numbers (700ms ease-out cubic).
+• CSV export: builds comma-separated string with headers,
+  triggers download via Blob URL.
+
+<span class="sec">━━━ ✨ POLISH ━━━</span>
+• fadeIn page transition (opacity 0→1, translateY 8→0, 0.3s).
+• popIn card animation (cubic-bezier spring) for new list items.
+• Hover: cards lift translateY(-3px) with enhanced shadow + violet glow border.
+• Custom scrollbar: 6px, rounded, #243350 thumb.
+• All charts destroy previous instance before re-render to avoid canvas reuse errors.
+• Nav items close sidebar on mobile after selection.</div>
+    </div>
+    <div class="callout tip reveal" data-delay="300"><div class="ci">✅</div><p><strong>Why it works:</strong> it names the exact colours, the API, the chart library, the currency format, the keyboard shortcuts. The more exact your prompt, the better the result. Vague in = generic out.</p></div>
+  </div>
+</section>
+
+<!-- SLIDE 9 — STEP 3 -->
+<section class="slide" data-title="Step 3 · Ship with Lovable">
+  <div class="slide-inner">
+    <div class="step-head reveal">
+      <div class="step-num s3">3</div>
+      <div><div class="st-tag emerald">Step 03 · Lovable.dev</div><h2>Make it real — login + live.</h2></div>
+    </div>
+    <p class="lead reveal" data-delay="120">The file works on your laptop. To let <em>anyone</em> use it — each with their own private data — we hand it to Lovable and ask it to add a Google login and put it online.</p>
+    <div class="substeps">
+      <div class="substep reveal" data-delay="220"><div class="ss-n">1</div><div class="ss-b"><strong>Go to lovable.dev and create a project</strong><span>The free tier is enough to start.</span></div></div>
+      <div class="substep reveal" data-delay="290"><div class="ss-n">2</div><div class="ss-b"><strong>Upload your index.html file</strong><span>Or describe the app to Lovable first, then import.</span></div></div>
+      <div class="substep reveal" data-delay="360"><div class="ss-n">3</div><div class="ss-b"><strong>Paste the Lovable prompt (next slide)</strong><span>It adds Google login via Supabase and makes the AI Advisor fully usable.</span></div></div>
+      <div class="substep reveal" data-delay="430"><div class="ss-n ok">4</div><div class="ss-b"><strong>Click Publish — you're live</strong><span>You get a free <span class="kbd">.lovable.app</span> link to share with anyone.</span></div></div>
+    </div>
+    <div class="chips reveal" data-delay="520">
+      <span class="chip emerald">🔐 Google login per user</span>
+      <span class="chip violet">🤖 AI advisor made usable</span>
+      <span class="chip sky">🌐 Live shareable URL</span>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 10 — LOVABLE PROMPT -->
+<section class="slide" data-title="The Lovable Prompt">
+  <div class="slide-inner">
+    <div class="kicker reveal">Paste this into Lovable</div>
+    <h2 class="title reveal" style="margin-bottom:10px">The Lovable Prompt.</h2>
+    <p class="lead reveal" data-delay="80" style="margin-bottom:8px">The full upgrade brief — real logins, a working AI advisor, mobile polish, and deployment — while keeping Spendly's exact look.</p>
+    <div class="panel reveal" data-delay="180" style="border-color:rgba(46,230,166,.32)">
+      <div class="panel-head">
+        <div class="ph-left"><div class="dots"><span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span></div><span class="ph-title">Lovable prompt — paste inside Lovable</span></div>
+        <button class="copy-btn" data-copy="lovablePromptText">⧉ Copy</button>
+      </div>
+      <div class="panel-body">I have uploaded an expense tracker web app called <span class="str">"Spendly"</span>. Upgrade it while keeping the existing design system unchanged (dark theme, glassmorphism, violet / emerald / rose / amber accents, Outfit font).
+
+<span class="sec">━━━ 1 · AUTH &amp; CLOUD STORAGE ━━━</span>
+<span class="item">•</span> Supabase Auth: Google sign-in, email/password, signup, password reset.
+<span class="item">•</span> Store all user data in Supabase.
+<span class="item">•</span> Row-Level Security so each user sees only their own data.
+
+<span class="sec">━━━ 2 · A REAL AI FINANCIAL ADVISOR ━━━</span>
+<span class="item">•</span> Replace the placeholder advisor with a fully working one (use any AI provider you think best).
+<span class="item">•</span> Analyse transactions, budgets, goals, categories, monthly trends, habits.
+<span class="item">•</span> Give budget tips, savings strategies, overspending alerts, summaries, goal suggestions, insights.
+<span class="item">•</span> Build a context system so it knows the full picture; support natural-language chat.
+
+<span class="sec">━━━ 3 · PREMIUM AUTH SCREENS ━━━</span>
+<span class="item">•</span> Modern Login, Signup &amp; Forgot-Password screens matching Spendly.
+<span class="item">•</span> Validation, loading states, animations, polished errors.
+
+<span class="sec">━━━ 4 · MOBILE OPTIMISATION ━━━</span>
+<span class="item">•</span> Fully responsive, mobile-first — layouts, nav, charts, forms, tables.
+
+<span class="sec">━━━ 5 · PRODUCTION READINESS ━━━</span>
+<span class="item">•</span> Refactor, improve performance, remove dead code, fix edge cases.
+
+<span class="sec">━━━ 6 · DEPLOYMENT ━━━</span>
+<span class="item">•</span> Deploy and provide a live public URL.</div>
+    </div>
+    <div class="callout reveal" data-delay="300"><div class="ci">💡</div><p>The line <strong>“keep the design unchanged”</strong> is what stops Lovable from altering the look — you stay in control of the result.</p></div>
+  </div>
+</section>
+
+
+<!-- SLIDE 12 — FEATURES -->
+<section class="slide" data-title="What's Inside">
+  <div class="slide-inner">
+    <div class="kicker reveal">What's inside</div>
+    <h2 class="title reveal">Everything packed into Spendly.</h2>
+    <p class="lead reveal" data-delay="80">7 pages, an AI advisor, charts, and Google login — all generated from one prompt.</p>
+    <div class="grid g3" style="margin-top:26px">
+      <div class="feat reveal" data-delay="120"><span class="fe">📊</span><h4>Live Dashboard</h4><p>Animated balance, income & expense cards, a donut chart, and recent activity.</p></div>
+      <div class="feat reveal" data-delay="180"><span class="fe">💳</span><h4>Transactions</h4><p>Add, edit, delete with 13 categories. Search, filter, sort, export to CSV.</p></div>
+      <div class="feat reveal" data-delay="240"><span class="fe">📈</span><h4>Analytics</h4><p>6-month bars, cash-flow line, expense donut, and a daily spending heatmap.</p></div>
+      <div class="feat reveal" data-delay="120"><span class="fe">💰</span><h4>Budget Tracker</h4><p>Per-category budgets. Bars turn amber then red as you near the limit.</p></div>
+      <div class="feat reveal" data-delay="180"><span class="fe">🎯</span><h4>Savings Goals</h4><p>Goals with emoji + deadline, inline top-up, and a trophy completion state.</p></div>
+      <div class="feat reveal" data-delay="240"><span class="fe">💡</span><h4>Insights</h4><p>Auto-generated tips from your real data plus a financial health score.</p></div>
+      <div class="feat reveal" data-delay="120"><span class="fe">🤖</span><h4>AI Advisor</h4><p>Chat with Claude about your actual spending, with real context injected.</p></div>
+      <div class="feat reveal" data-delay="180"><span class="fe">🔐</span><h4>Google Login</h4><p>Each user gets private data via Supabase. Sign in with one click.</p></div>
+      <div class="feat reveal" data-delay="240"><span class="fe">📱</span><h4>Mobile Ready</h4><p>Hamburger sidebar and a touch-friendly layout on every screen size.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 13 — RESULT -->
+<section class="slide" data-title="The Result">
+  <div class="slide-inner">
+    <div class="kicker reveal">The result</div>
+    <h2 class="title reveal">From an idea<br>to a <span class="grad">live app.</span></h2>
+    <p class="lead reveal" data-delay="100">Built without writing code by hand — with a Google login and an AI advisor. Click to open it.</p>
+    <div class="grid" style="margin-top:28px;gap:16px">
+      <a class="linkcard reveal" data-delay="200" href="https://ai-guided-finances.lovable.app/" target="_blank" rel="noopener">
+        <div class="lc-ic ic-violet">🚀</div>
+        <div><div class="lc-lab">Live App · with login</div><h4>Spendly — full app</h4><div class="lc-url">ai-guided-finances.lovable.app</div></div>
+        <div class="lc-go">↗</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 14 — TAKEAWAYS -->
+<section class="slide" data-title="Why It Works">
+  <div class="slide-inner">
+    <div class="kicker reveal">Remember this</div>
+    <h2 class="title reveal">Why this actually works.</h2>
+    <div class="grid g2" style="margin-top:28px">
+      <div class="card reveal" data-delay="120"><div class="ic ic-violet">🎯</div><h3>Be specific</h3><p>Exact colours, exact features, exact behaviour. Detail in the prompt becomes quality in the app.</p></div>
+      <div class="card reveal" data-delay="200"><div class="ic ic-sky">🗣️</div><h3>You direct, AI builds</h3><p>You make the decisions and describe the goal. The AI does the heavy lifting.</p></div>
+      <div class="card reveal" data-delay="280"><div class="ic ic-emerald">🔁</div><h3>Iterate freely</h3><p>Say “continue”, tweak a line, ask for a change. Building is a conversation, not one shot.</p></div>
+      <div class="card reveal" data-delay="360"><div class="ic ic-amber">🧩</div><h3>Right tool per job</h3><p>Claude to build the app, Lovable to add login and ship it. Each tool plays its strength.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SLIDE 15 — CLOSING -->
+<section class="slide center" data-title="Your Turn">
+  <div class="slide-inner">
+    <div class="badge reveal"><span class="dot-live"></span> Your turn</div>
+    <h1 class="display reveal" style="font-size:clamp(38px,6.5vw,76px)">Now <span class="grad">build yours.</span></h1>
+    <p class="lead reveal">Pick an idea. Brief the AI. Ship it today. The only limit is how clearly you can describe what you want.</p>
+    <div class="chips reveal" data-delay="220" style="margin-top:30px">
+      <a class="chip violet" href="https://ai-guided-finances.lovable.app/" target="_blank" rel="noopener">🚀 Open the Live App ↗</a>
+    </div>
+    <p class="muted reveal" data-delay="340" style="margin-top:38px;font-size:14px">Spendly · A teaching project by <strong>Prof. Chinmaya Kumar Swain</strong><br>IIM Jammu · for the MDP Programme</p>
+    <p class="reveal" data-delay="440" style="margin-top:22px;font-family:'Syne',sans-serif;font-weight:700;font-size:20px;letter-spacing:-.3px">Thank you 🙌</p>
+  </div>
+</section>
+
+</div><!-- /deck -->
+
+
+<footer class="controls">
+  <div class="dots-nav" id="dots"></div>
+  <div class="nav-arrows">
+    <button class="navb" id="prevBtn" title="Previous (←)">‹</button>
+    <span class="counter"><b id="curNum">1</b> / <span id="totNum">15</span></span>
+    <button class="navb" id="nextBtn" title="Next (→)">›</button>
+  </div>
+</footer>
+
+<div class="hint" id="hint"><span class="kbd">→</span> / <span class="kbd">Space</span> advance · <span class="kbd">M</span> menu · <span class="kbd">F</span> fullscreen</div>
+
+<div class="overview" id="overview">
+  <button class="ov-close" id="ovClose" title="Close (Esc)">✕</button>
+  <div class="ov-title">Jump to any slide</div>
+  <div class="ov-sub">Click a section to go straight to it.</div>
+  <div class="ov-grid" id="ovGrid"></div>
+</div>
+
+<script type="text/plain" id="briefPromptText">I want to make a personal expense tracker app called "Spendly" — with a dashboard, charts, budgets, savings goals, and an AI advisor.
+
+Don't build it yet. First, write me a detailed prompt that I can paste back to you to create the whole app as a single HTML file.
+
+Just give me the prompt to copy.</script>
+
+<script type="text/plain" id="masterPromptText">Build a premium personal finance web app called "Spendly" as a single self-contained HTML file.
+Use Chart.js 4.4.1 from cdnjs and Outfit + DM Mono from Google Fonts.
+No other external dependencies.
+
+━━━ 🎨 DESIGN SYSTEM ━━━
+CSS variables only — never hardcode colors:
+
+--bg:#080d14  --bg2:#0e1420  --bg3:#151c2c  --bg4:#1c2438
+--card:#111827  --border:#1e2d45  --border2:#243350
+--violet:#7c6bff  --violet2:#6254e8  --violet-glow:rgba(124,107,255,0.18)
+--emerald:#0fda85  --rose:#ff4d6a  --amber:#ffb800  --sky:#38bdf8
+--text:#e8edf5  --text2:#8fa3be  --text3:#4a637e
+
+Font: Outfit for all UI, DM Mono for amounts/codes.
+Background #080d14. Cards use #111827 with 1px solid #1e2d45 border,
+border-radius:20px, subtle drop shadow, and a lift + glow on hover.
+
+━━━ 🏗️ LAYOUT ━━━
+Fixed left sidebar (260px wide, #0e1420 bg) + scrollable main area.
+
+Sidebar contains:
+• Logo: gradient violet square icon + "Spendly" wordmark (violet accent on "ly")
+• Nav items with emoji icons, active state = violet gradient bg + violet border
+• Section labels in uppercase 10px tracking
+• Bottom user card with gradient avatar (violet→emerald), name, email
+
+Sticky topbar (70px, backdrop-filter:blur(20px)) with:
+• Hamburger (mobile) + page title left side
+• Month selector (‹ select ›) + "+ Add Transaction" button right side
+
+Mobile: sidebar slides in/out with dark overlay, hamburger shows at ≤800px.
+
+━━━ 📄 PAGES (7 total, SPA via tab switching) ━━━
+
+1. Dashboard
+• 4 stat cards in a row: Balance (violet glow), Income (emerald), Expenses (rose),
+  Savings Rate (amber). Each has an icon, animated counter, and a small sub-badge.
+• 2 more stat cards: Daily Avg Spend, Biggest Expense.
+• 2-column row: Donut chart (expense breakdown) + Spending by Category bar list
+  with colored progress bars.
+• Recent transactions list (last 8).
+
+2. Transactions
+• Filter row: search bar + All/Income/Expense pills + category dropdown +
+  sort dropdown + 📥 Export CSV button.
+• Summary chips row (filtered totals).
+• Full scrollable transaction list, each item: category emoji icon (colored bg circle),
+  title, category + note, edit/delete actions, amount (green +/red −),
+  date + optional 🔄 recurring amber badge.
+
+3. Analytics
+• Income vs Expense grouped bar chart (6 months).
+• Expense distribution donut chart + legend.
+• Cumulative cash flow line chart.
+• Top spending categories ranked list.
+• Daily spending heatmap (grid of day squares, color intensity = spend amount).
+
+4. Budget
+• Budget overview bar chart + Budget Health Score gauge (canvas arc ring, 0–100,
+  color: green≥80, amber≥60, red<60).
+• Category budget cards: progress bar turns amber at 75%, rose at 90%,
+  label shows ₹spent/₹limit, over-budget chip.
+
+5. Goals
+• Goal cards: emoji + name, % badge, animated progress bar (violet fill),
+  ₹saved / ₹to-go / days left footer, inline top-up input + "Add" button,
+  "🏆 Goal Complete!" state.
+• Goals bar chart (saved vs target per goal).
+
+6. Insights
+• Financial Health Score ring + interpretation label.
+• Personalized insight cards (auto-generated from actual data: savings rate,
+  budget breaches, biggest category).
+• Spending forecast line chart for rest of current month.
+• 6-month income vs expense trend line.
+
+7. AI Advisor
+• Header bar: gradient icon, title, green pulsing online dot.
+• Chat window (max-height:450px, scrollable): bot bubbles (dark card, top-left
+  radius flat) + user bubbles (violet gradient, top-right radius flat),
+  avatars, typing indicator (3 animated dots).
+• Quick-prompt chips: 'Analyze my spending', 'Am I on track with my goals?',
+  'How can I save more?', 'Where am I overspending?', 'Forecast my month-end balance'.
+• Textarea input + send button (violet gradient, arrow icon).
+• Enter to send, Shift+Enter for newline.
+• Right panel: Financial Snapshot card (income, expenses, balance, savings rate,
+  tx count, goals count) + Tips card.
+• On send, call POST https://api.anthropic.com/v1/messages with
+  model claude-sonnet-4-20250514, inject user's real transactions/budgets/goals
+  as system context. Show typing indicator while awaiting response.
+
+━━━ 📋 TRANSACTION MODAL ━━━
+Full-screen overlay modal with:
+• Expense / Income toggle pills (rose active vs emerald active).
+• Amount input (large, centered, ₹ prefix).
+• Description input.
+• Category grid (emoji buttons, selected = violet border + bg glow).
+  Categories: Food, Transport, Shopping, Entertainment, Health, Bills, Education,
+  Travel, Housing, Freelance, Salary, Investment, Other.
+• Date picker.
+• Note input.
+• "🔄 Mark as recurring" checkbox row (amber accent, styled container).
+• Full-width "Save Transaction" button.
+• Escape to close, click outside overlay to close.
+
+━━━ 💾 DATA & LOGIC ━━━
+• localStorage for all state (spendly_tx, spendly_budgets, spendly_goals).
+• Seed 25+ realistic transactions across Apr–May 2025 on first load.
+• uid() = Date.now() + Math.random() string for IDs.
+• INR(v) formatter using Intl.NumberFormat('en-IN') with ₹ symbol.
+• All charts: dark theme, #1e2d45 grid lines, #4a637e tick labels,
+  tooltips with dark bg.
+• renderAll() re-renders current page on any data change.
+• Keyboard: N = open Add Transaction modal (when no modal open and not typing),
+  Escape = close any modal.
+• Toast notifications (bottom-right, slide up, ✅/❌ prefix, auto-dismiss 3s).
+• animateCount() for all stat numbers (700ms ease-out cubic).
+• CSV export: builds comma-separated string with headers,
+  triggers download via Blob URL.
+
+━━━ ✨ POLISH ━━━
+• fadeIn page transition (opacity 0→1, translateY 8→0, 0.3s).
+• popIn card animation (cubic-bezier spring) for new list items.
+• Hover: cards lift translateY(-3px) with enhanced shadow + violet glow border.
+• Custom scrollbar: 6px, rounded, #243350 thumb.
+• All charts destroy previous instance before re-render to avoid canvas reuse errors.
+• Nav items close sidebar on mobile after selection.</script>
+
+<script type="text/plain" id="lovablePromptText">I have uploaded an expense tracker web app called **Spendly**. Please upgrade it while keeping the existing design system completely unchanged (dark navy theme, glassmorphism cards, violet/emerald/rose/amber accents, Outfit font).
+
+### Requirements
+
+**1. Authentication & Cloud Storage**
+
+* Integrate Supabase Auth with Google Sign-In, Email/Password Login, Signup, and Password Reset.
+* Store all user data in Supabase.
+* Implement Row Level Security (RLS) so users can only access their own transactions, budgets, goals, and preferences.
+
+**2. Build a Real AI Financial Advisor**
+
+* The current AI Advisor is not functional and does not provide genuine AI-powered assistance.
+* Replace it with a fully working AI financial advisor.
+* Use any AI provider, model, or architecture you consider best.
+* The AI must analyze:
+
+  * Transactions
+  * Budgets
+  * Savings goals
+  * Spending categories
+  * Monthly trends
+  * Financial habits
+* Generate personalized:
+
+  * Budget recommendations
+  * Savings strategies
+  * Overspending alerts
+  * Financial summaries
+  * Goal-achievement suggestions
+  * Spending insights
+* Create a robust context system so the AI understands the user's complete financial situation before responding.
+* The advisor should support natural language conversations and answer questions about the user's finances.
+
+**3. Premium Authentication Experience**
+
+* Create modern Login, Signup, and Forgot Password screens matching the existing Spendly design.
+* Include validation, loading states, animations, and polished error handling.
+
+**4. Mobile Optimization**
+
+* Make the entire application fully responsive and mobile-first.
+* Optimize layouts, navigation, charts, forms, and tables for phones, tablets, and desktops.
+
+**5. Production Readiness**
+
+* Refactor code where necessary.
+* Improve performance and maintainability.
+* Remove redundant code and fix edge cases.
+
+**6. Deployment**
+
+* Deploy the application and provide a live public URL.
+
+### Deliverables
+
+* Production-ready code
+* Supabase integration and schema
+* Fully functional AI Advisor
+* Responsive UI
+* Deployment configuration
+* Live public URL
+* Setup and deployment documentation</script>
+
+<script>
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll('.slide'));
+  const total = slides.length;
+  let current = 0, animating = false;
+
+  // build chrome
+  const dotsWrap = document.getElementById('dots');
+  const ovGrid = document.getElementById('ovGrid');
+  document.getElementById('totNum').textContent = total;
+  slides.forEach((s,i)=>{
+    const d = document.createElement('button');
+    d.className='d'; d.title = s.dataset.title || ('Slide '+(i+1));
+    d.addEventListener('click',()=>go(i));
+    dotsWrap.appendChild(d);
+
+    const o = document.createElement('button');
+    o.className='ov-item';
+    o.innerHTML = '<div class="oi-n">'+String(i+1).padStart(2,'0')+'</div><div class="oi-t">'+(s.dataset.title||('Slide '+(i+1)))+'</div>';
+    o.addEventListener('click',()=>{ closeOverview(); go(i); });
+    ovGrid.appendChild(o);
+  });
+  const dotEls = Array.from(dotsWrap.children);
+
+  function runReveals(slide){
+    const els = slide.querySelectorAll('.reveal');
+    els.forEach((el,i)=>{
+      el.classList.remove('in');
+      const d = el.dataset.delay !== undefined ? +el.dataset.delay : (i*85 + 110);
+      el.style.transitionDelay = d+'ms';
+    });
+    void slide.offsetWidth; // reflow so re-entry replays
+    requestAnimationFrame(()=> els.forEach(el=>el.classList.add('in')));
+  }
+  function resetReveals(slide){
+    slide.querySelectorAll('.reveal').forEach(el=>{ el.classList.remove('in'); el.style.transitionDelay='0ms'; });
+  }
+  function runCounters(slide){
+    slide.querySelectorAll('[data-count]').forEach(el=>{
+      const target=+el.dataset.count, dur=1100, t0=performance.now();
+      const pre=el.dataset.prefix||'', suf=el.dataset.suffix||'', inr=el.dataset.fmt==='in';
+      requestAnimationFrame(function tick(now){
+        const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3), v=Math.round(target*e);
+        el.textContent = pre + (inr ? v.toLocaleString('en-IN') : v) + suf;
+        if(p<1) requestAnimationFrame(tick);
+      });
+    });
+  }
+  // scale slide content down so it always fits the screen (no page scroll)
+  function fitSlide(slide){
+    const inner = slide && slide.querySelector('.slide-inner');
+    if(!inner) return;
+    inner.style.transform = 'scale(1)';
+    const cs = getComputedStyle(slide);
+    const avail = slide.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const need = inner.scrollHeight;
+    const scale = need > avail ? Math.max(0.5, avail / need) : 1;
+    inner.style.transform = 'scale(' + scale.toFixed(4) + ')';
+  }
+
+  function updateChrome(){
+    document.getElementById('progressBar').style.width = ((current+1)/total*100)+'%';
+    document.getElementById('curNum').textContent = current+1;
+    dotEls.forEach((d,i)=>d.classList.toggle('on', i===current));
+    document.getElementById('prevBtn').disabled = current===0;
+    document.getElementById('nextBtn').disabled = current===total-1;
+  }
+
+  function go(n){
+    n = Math.max(0, Math.min(total-1, n));
+    if(n===current && slides[current].classList.contains('active')){ return; }
+    slides.forEach((s,i)=>{
+      if(i===current && i!==n){ s.classList.remove('active'); resetReveals(s); }
+    });
+    current = n;
+    slides.forEach((s,i)=> s.classList.toggle('active', i===current));
+    runReveals(slides[current]);
+    runCounters(slides[current]);
+    fitSlide(slides[current]);
+    updateChrome();
+  }
+  const next = ()=>go(current+1);
+  const prev = ()=>go(current-1);
+
+  // controls
+  document.getElementById('nextBtn').addEventListener('click',next);
+  document.getElementById('prevBtn').addEventListener('click',prev);
+
+  // overview menu
+  const overview = document.getElementById('overview');
+  const openOverview = ()=>overview.classList.add('open');
+  const closeOverview = ()=>overview.classList.remove('open');
+  const toggleOverview = ()=>overview.classList.toggle('open');
+  document.getElementById('menuBtn').addEventListener('click',toggleOverview);
+  document.getElementById('ovClose').addEventListener('click',closeOverview);
+
+  // fullscreen
+  document.getElementById('fsBtn').addEventListener('click',()=>{
+    if(!document.fullscreenElement){ document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); }
+    else { document.exitFullscreen && document.exitFullscreen(); }
+  });
+
+  // hint auto-hide
+  const hint = document.getElementById('hint');
+  let hintTimer = setTimeout(()=>hint.classList.add('hide'), 6000);
+  function hideHint(){ hint.classList.add('hide'); clearTimeout(hintTimer); }
+
+  // keyboard
+  window.addEventListener('keydown',(e)=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); hideHint(); next(); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); hideHint(); prev(); }
+    else if(e.key==='Home'){ e.preventDefault(); go(0); }
+    else if(e.key==='End'){ e.preventDefault(); go(total-1); }
+    else if(e.key==='m'||e.key==='M'){ toggleOverview(); }
+    else if(e.key==='f'||e.key==='F'){ document.getElementById('fsBtn').click(); }
+    else if(e.key==='Escape'){ closeOverview(); }
+  });
+
+  // swipe
+  let tx=0, ty=0;
+  deck.addEventListener('touchstart',(e)=>{ tx=e.changedTouches[0].clientX; ty=e.changedTouches[0].clientY; },{passive:true});
+  deck.addEventListener('touchend',(e)=>{
+    const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+    if(Math.abs(dx)>60 && Math.abs(dx)>Math.abs(dy)){ hideHint(); dx<0 ? next() : prev(); }
+  },{passive:true});
+
+  // cursor spotlight + per-card shine
+  document.addEventListener('pointermove',(e)=>{
+    document.documentElement.style.setProperty('--mx', e.clientX+'px');
+    document.documentElement.style.setProperty('--my', e.clientY+'px');
+    const card = e.target.closest && e.target.closest('.card,.feat,.linkcard,.flow-node');
+    if(card){ const r=card.getBoundingClientRect(); card.style.setProperty('--mx',(e.clientX-r.left)+'px'); card.style.setProperty('--my',(e.clientY-r.top)+'px'); }
+  },{passive:true});
+
+  // copy buttons
+  document.querySelectorAll('.copy-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const src = document.getElementById(btn.dataset.copy);
+      const text = src ? src.textContent.trim() : '';
+      const done = ()=>{ const o=btn.innerHTML; btn.innerHTML='✓ Copied!'; setTimeout(()=>btn.innerHTML=o,2000); };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+      } else { fallbackCopy(text,done); }
+    });
+  });
+  function fallbackCopy(text,cb){
+    const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta); cb && cb();
+  }
+
+  // re-fit when the window or fonts change
+  let _rt; window.addEventListener('resize',()=>{ clearTimeout(_rt); _rt=setTimeout(()=>fitSlide(slides[current]),120); });
+  window.addEventListener('load',()=>fitSlide(slides[current]));
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(()=>fitSlide(slides[current])); }
+
+  // init
+  slides[0].classList.add('active');
+  runReveals(slides[0]);
+  runCounters(slides[0]);
+  fitSlide(slides[0]);
+  updateChrome();
+})();
+</script>
+</body>
+</html>
